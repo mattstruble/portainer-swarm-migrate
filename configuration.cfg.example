@@ -1,0 +1,7 @@
+[portainer]
+username=USER
+password=PASSWORD
+url=http://127.0.0.1:9000
+
+[swarm]
+clusterID=ID
