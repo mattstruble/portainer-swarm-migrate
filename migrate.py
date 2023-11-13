@@ -4,6 +4,7 @@ import json
 import time
 import logging
 import sys
+from packaging import version
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger(__file__)
@@ -42,6 +43,7 @@ class PortainerAPI:
         self._validate_response(response)
 
         self.jwt = json.loads(response.text)["jwt"]
+        self.get_version_number()
 
     @property
     def headers(self) -> dict:
@@ -64,18 +66,34 @@ class PortainerAPI:
         self._validate_response(response)
         return response
 
+    def get_version_number(self):
+        """There are changes in the api after certain versions"""
+        response = self._get(f"{self.url}/api/system/version")
+        self._version = json.loads(response.text)["ServerVersion"]
+
     def get_stacks(self) -> list:
         response = self._get(f"{self.url}/api/stacks")
         return json.loads(response.text)
 
     def start_stack(self, stack: dict):
         logger.debug(f"Starting: {stack['Name']}")
-        self._post(f"{self.url}/api/stacks/{stack['Id']}/start")
+
+        base_uri = f"{self.url}/api/stacks/{stack['Id']}/start"
+        if version.parse(self._version) >= version.parse("2.19.0"):
+            query = f"?endpointId={stack['EndpointId']}"
+            self._post(f"{base_uri}{query}")
+        else:
+            self._post(base_uri)
 
     def stop_stack(self, stack: dict):
         logger.debug(f"Stopping: {stack['Name']}")
         try:
-            self._post(f"{self.url}/api/stacks/{stack['Id']}/stop")
+            base_uri = f"{self.url}/api/stacks/{stack['Id']}/stop"
+            if version.parse(self._version) >= version.parse("2.19.0"):
+                query = f"?endpointId={stack['EndpointId']}"
+                self._post(f"{base_uri}{query}")
+            else:
+                self._post(base_uri)
         except PortainerAPIError as api_error:
             if api_error.code == 400 and api_error.message == "Stack is already inactive":
                 print(api_error.message)
